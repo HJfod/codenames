@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        html {
+            height: 100%;
+        }
+        body {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
+            font-family: sans-serif;
+            background-color: beige;
+            width: 100%;
+            height: 100%;
+            text-align: center;
+        }
+        main {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: .25rem;
+        }
+        div.row {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
+            gap: .25rem;
+        }
+        canvas {
+            background-color: lightgray;
+            width: min(50vw, 400px);
+            height: min(50vw, 400px);
+        }
+        button, select, textarea {
+            background-color: whitesmoke;
+            padding: .5rem;
+            padding-left: .75rem;
+            padding-right: .75rem;
+            border: .1rem solid black;
+            border-radius: .25rem;
+        }
+        button:disabled, select:disabled {
+            background-color: lightgray;
+            color: slategray;
+            border-color: transparent;
+        }
+        button:hover:not(:disabled), select:hover:not(:disabled) {
+            background-color: lightgray;
+            cursor: pointer;
+        }
+        textarea {
+            resize: none;
+            width: 30ch;
+            height: 30ch;
+            font-family: sans-serif;
+        }
+        span.starter {
+            font-weight: bold;
+        }
+        span.blue {
+            color: blue;
+        }
+        span.red {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <h3>super nopeasti kyhätty codenames lauta kone</h3>
+        <canvas width="400" height="400" id="board"></canvas>
+        <p id="starter-info"></p>
+        <div class="row">
+            <button id="regen-btn">Luo uusi lauta</button>
+            <select id="starter">
+                <option value="random">Satunnainen aloittaja</option>
+                <option value="blue">Sininen aloittaa</option>
+                <option value="red">Punainen aloittaa</option>
+            </select>
+        </div>
+        <div>
+            <p id="board-count"></p>
+            <button id="undo-btn" disabled>Eiku edellinen takas</button>
+            <button id="redo-btn" disabled>Eiku seuraava takas</button>
+            <button id="clear-btn" disabled>Nollaa</button>
+        </div>
+    </main>
+
+    <script defer>
+        // @ts-check
+
+        /** @typedef {("b" | "r" | "a" | undefined)} Cell */
+        /** @typedef {[Cell, Cell, Cell, Cell, Cell]} CellRow */
+        /** @typedef {[CellRow, CellRow, CellRow, CellRow, CellRow]} CellGrid */
+        /** @typedef {{ grid: CellGrid, starterIsBlue: boolean }} Board */
+
+        const starterInfo = /** @type {HTMLParagraphElement} */ (document.querySelector("#starter-info"));
+        const boardCount = /** @type {HTMLParagraphElement} */ (document.querySelector("#board-count"));
+
+        const regenBtn = /** @type {HTMLButtonElement} */ (document.querySelector("#regen-btn"));
+        const undoBtn = /** @type {HTMLButtonElement} */ (document.querySelector("#undo-btn"));
+        const redoBtn = /** @type {HTMLButtonElement} */ (document.querySelector("#redo-btn"));
+        const clearBtn = /** @type {HTMLButtonElement} */ (document.querySelector("#clear-btn"));
+        const starterSelect = /** @type {HTMLButtonElement} */ (document.querySelector("#starter"));
+
+        const canvas = /** @type {HTMLCanvasElement} */ (document.querySelector("#board"));
+        const ctx = /** @type {CanvasRenderingContext2D} */ (canvas.getContext("2d"));
+
+        const inset = 5;
+        const area = {
+            x: inset * 2, y: inset * 2,
+            width: canvas.width - inset * 4,
+            height: canvas.height - inset * 4
+        };
+        const cell = { width: area.width / 5, height: area.height / 5 };
+
+        /** @type {Board[]} */
+        const BOARD_HISTORY = [];
+        let HISTORY_POINT = 0;
+
+        regenBtn.addEventListener("click", () => {
+            let forceStarterIsBlue = undefined;
+            switch (starterSelect.value) {
+                case "red": forceStarterIsBlue = false; break;
+                case "blue": forceStarterIsBlue = true; break;
+            }
+            const board = genBoard(forceStarterIsBlue);
+            BOARD_HISTORY.push(board);
+            HISTORY_POINT = BOARD_HISTORY.length - 1;
+            setBoard(board);
+        });
+        undoBtn.addEventListener("click", () => {
+            HISTORY_POINT -= 1;
+            setBoard(BOARD_HISTORY[HISTORY_POINT]);
+        });
+        redoBtn.addEventListener("click", () => {
+            HISTORY_POINT += 1;
+            setBoard(BOARD_HISTORY[HISTORY_POINT]);
+        });
+        clearBtn.addEventListener("click", () => {
+            BOARD_HISTORY.length = 0;
+            HISTORY_POINT = 0;
+            setBoard(undefined);
+        });
+
+        setBoard(undefined);
+
+        /**
+         * @param {Board | undefined} board
+         */
+        function setBoard(board) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let i = 0; i < 5; i += 1) {
+                for (let j = 0; j < 5; j += 1) {
+                    if (board) {
+                        switch (board.grid[i][j]) {
+                            case "b": ctx.fillStyle = "blue"; break;
+                            case "r": ctx.fillStyle = "red"; break;
+                            case "a": ctx.fillStyle = "black"; break;
+                            case undefined: ctx.fillStyle = "beige"; break;
+                        }
+                    }
+                    else {
+                        ctx.fillStyle = "lightslategray";
+                    }
+                    ctx.fillRect(
+                        i * cell.width + inset + area.x,
+                        j * cell.height + inset + area.y,
+                        cell.width - inset * 2,
+                        cell.height - inset * 2
+                    );
+                }
+                ctx.lineWidth = inset;
+                ctx.strokeStyle = board ? (board.starterIsBlue ? "blue" : "red") : "darkslategray";
+                ctx.strokeRect(inset / 2 + 1, inset / 2 + 1, canvas.width - inset - 1, canvas.height - inset - 1);
+            }
+            starterInfo.innerHTML = board ?
+                `Aloittaja: <span class="starter ${
+                    board.starterIsBlue ? "blue" : "red"
+                }">${board.starterIsBlue ? "Sininen" : "Punainen"}</span>` : 
+                "Paina nappia";
+
+            undoBtn.disabled = HISTORY_POINT < 1;
+            redoBtn.disabled = BOARD_HISTORY.length === 0 || HISTORY_POINT === BOARD_HISTORY.length - 1;
+            clearBtn.disabled = BOARD_HISTORY.length === 0;
+            boardCount.innerHTML = BOARD_HISTORY.length > 0 ?
+                `Lauta ${HISTORY_POINT + 1}/${BOARD_HISTORY.length}` : 
+                "-";
+        }
+
+        /**
+         * @param {boolean | undefined=} starterIsBlue
+         * @returns {Board}
+         */
+        function genBoard(starterIsBlue) {
+            /** @type {CellGrid} */
+            const grid = /** @type {any} */ (Array(5).fill(undefined).map(() => Array(5).fill(undefined)));
+
+            /**
+             * @param {Cell} color
+             * @param {number} count
+             */
+            function gen(color, count) {
+                for (let i = 0; i < count; i += 1) {
+                    while (true) {
+                        const [x, y] = [Math.floor(Math.random() * 4.9), Math.floor(Math.random() * 4.9)];
+                        if (grid[x][y] !== undefined) {
+                            continue;
+                        }
+                        grid[x][y] = color;
+                        break;
+                    }
+                }
+            }
+
+            starterIsBlue = starterIsBlue ?? Math.random() > 0.5;
+            gen("b", 8 + Number(starterIsBlue));
+            gen("r", 8 + Number(!starterIsBlue));
+            gen("a", 1);
+
+            return { grid, starterIsBlue };
+        }
+
+    </script>
+</body>
+</html>
