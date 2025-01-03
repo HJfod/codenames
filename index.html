@@ -176,6 +176,60 @@
                         cell.width - inset * 2,
                         cell.height - inset * 2
                     );
+                    if (board) {
+                        switch (board.grid[i][j]) {
+                            case "b": {
+                                ctx.lineWidth = inset * 2;
+                                ctx.lineCap = "round";
+                                ctx.strokeStyle = "#0000cc";
+                                ctx.beginPath();
+                                ctx.rect(
+                                    i * cell.width + inset * 4 + area.x,
+                                    j * cell.height + inset * 4 + area.y,
+                                    cell.width - inset * 8,
+                                    cell.height - inset * 8, 
+                                );
+                                ctx.stroke();
+                            } break;
+
+                            case "r": {
+                                ctx.lineWidth = inset * 2;
+                                ctx.lineCap = "round";
+                                ctx.strokeStyle = "#cc0000";
+                                ctx.beginPath();
+                                ctx.ellipse(
+                                    (i + 0.5) * cell.width + area.x,
+                                    (j + 0.5) * cell.height + area.y,
+                                    cell.width / 2 - inset * 4,
+                                    cell.height / 2 - inset * 4, 
+                                    0, 0, Math.PI * 2
+                                );
+                                ctx.stroke();
+                            } break;
+
+                            case "a": {
+                                ctx.save();
+                                ctx.translate(
+                                    (i + 0.5) * cell.width + area.x,
+                                    (j + 0.5) * cell.height + area.y,
+                                );
+                                ctx.rotate(Math.PI / 4);
+
+                                ctx.fillStyle = "#444";
+
+                                ctx.beginPath();
+                                ctx.rect(
+                                    -cell.width / 2 + inset * 5,
+                                    -cell.height / 2 + inset * 5,
+                                    cell.width - inset * 10,
+                                    cell.height - inset * 10, 
+                                );
+                                ctx.fill();
+
+                                ctx.restore();
+                            } break;
+                        }
+                    }
                 }
                 ctx.lineWidth = inset;
                 ctx.strokeStyle = board ? (board.starterIsBlue ? "blue" : "red") : "darkslategray";
